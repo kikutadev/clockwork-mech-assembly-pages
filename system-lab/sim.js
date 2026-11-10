@@ -39,7 +39,7 @@ const INIT_SAVE = {
   installed:{weapon:"basic", legs:"standard", sensor:"basic", armor:"basic"},
   owned:["basic:weapon","long:weapon","standard:legs","swift:legs","basic:sensor","basic:armor"],
   research:[], facilities:{turret:false,mineW:false,mineE:false},
-  home:{x:410,y:325}
+  home:{x:570,y:325}
 };
 export const W=900, H=560;
 export const GATE={x:470,y:280,r:42};
@@ -102,7 +102,7 @@ export class Game {
     const st=this.stats();
     this.time=0;
     this.kills=0;
-    this.spawnIn=2.5;
+    this.spawnIn=0.8;
     this.nextId=1;
     this.enemies=[];
     this.bullets=[];
@@ -288,7 +288,8 @@ export class Game {
     const kind=tier===1?"crawler":n%5===0?"armored":n%3===0?"swift":"crawler";
     const edge=tier===1?0:(n%4);
     const pad=27, random=this.random;
-    let x=pad,y=H*(.24+random()*.52);
+    let x=100,y=H*(.24+random()*.52);
+    if(n===1&&tier===1){x=350;y=310;}
     if(edge===1){x=W-pad;y=H*(.22+random()*.56);}
     if(edge===2){x=W*(.25+random()*.5);y=pad;}
     if(edge===3){x=W*(.25+random()*.5);y=H-pad;}
