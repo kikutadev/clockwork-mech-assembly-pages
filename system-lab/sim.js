@@ -28,6 +28,19 @@ export const PARTS = {
     {id:"heavy", name:"重装甲", cost:5, hp:170, speedFactor:.77, note:"耐久増加・移動低下"}
   ]
 };
+// Temporary System Lab unlock milestones; SPEC.md does not fix these kill counts.
+export const UNLOCKS = [
+  {id:"return", kills:2, name:"自動帰還", detail:"「周囲に敵がいない→戻る／停止」と守備位置が使えます", tab:"command"},
+  {id:"parts", kills:4, name:"武器・脚の換装", detail:"長砲身・機動脚を選べます", tab:"parts"},
+  {id:"avoid", kills:6, name:"近接回避", detail:"「敵が近すぎる→離れる」を組めます", tab:"command"},
+  {id:"gate", kills:8, name:"昇降口優先", detail:"「敵が昇降口付近」を条件にできます", tab:"command"},
+  {id:"mines", kills:10, name:"防衛地雷", detail:"地雷の設置と封鎖扉の補強研究が使えます", tab:"team"},
+  {id:"story", kills:12, name:"次の物語", detail:"格納庫から任意に次の敵帯へ進めます", tab:"research"},
+  {id:"advancedParts", kills:14, name:"追加パーツ", detail:"センサー・装甲の換装と部品製造ができます", tab:"parts"},
+  {id:"turret", kills:16, name:"自動砲台", detail:"砲台の配置と建設資源拡張研究が使えます", tab:"team"}
+];
+const CONDITION_UNLOCK = {clear:"return", close:"avoid", gate:"gate"};
+const ACTION_UNLOCK = {return:"return", hold:"return", retreat:"avoid"};
 export const RESEARCH = [
   {id:"fire", name:"火力解析", cost:9, description:"自機の武器ダメージ +25%"},
   {id:"gate", name:"封鎖扉補強", cost:10, description:"封鎖扉の最大耐久 +50"},
@@ -87,6 +100,14 @@ export class Game {
     }
     if(!s.home||!Number.isFinite(s.home.x)||!Number.isFinite(s.home.y))s.home=clone(INIT_SAVE.home);
   }
+  unlockAt(id){return UNLOCKS.find(u=>u.id===id)?.kills||0;}
+  isUnlocked(id){return this.save.totalKills>=this.unlockAt(id);}
+  nextUnlock(){return UNLOCKS.find(u=>!this.isUnlocked(u.id))||null;}
+  canCondition(id){return CONDITIONS.some(c=>c[0]===id)&&this.isUnlocked(CONDITION_UNLOCK[id]);}
+  canAction(id){return ACTIONS.some(a=>a[0]===id)&&this.isUnlocked(ACTION_UNLOCK[id]);}
+  canEquip(slot){return this.isUnlocked(["weapon","legs"].includes(slot)?"parts":"advancedParts");}
+  canResearch(id){return id==="fire"||id==="gate"&&this.isUnlocked("mines")||id==="build"&&this.isUnlocked("turret");}
+  canFacility(id){return id==="turret"?this.isUnlocked("turret"):this.isUnlocked("mines");}
   part(slot){return PARTS[slot].find(p=>p.id===this.save.installed[slot]);}
   stats(){
     const gun=this.part("weapon"),legs=this.part("legs"),sensor=this.part("sensor"),armor=this.part("armor");
@@ -112,6 +133,7 @@ export class Game {
     this.weaponWait=0;
     this.turretWait=0;
     this.locks={};
+    this.unlockNotice=null;
     this.active=[{text:"判定待ち",active:false},{text:"判定待ち",active:false}];
     this.used={move:null,weapon:null};
     this.logs=["新たな防衛。命令は登録された2件のみ実行します。"];
@@ -125,7 +147,9 @@ export class Game {
     this.lastAction=message;
   }
   updateCommand(i,condition,action){
-    if(this.save.slots[i]) this.save.slots[i]={condition,action};
+    if(!this.save.slots[i]||!this.canCondition(condition)||!this.canAction(action))return false;
+    this.save.slots[i]={condition,action};
+    return true;
   }
   selectAt(x,y,hitRadius=30){
     if(this.paused||this.defeated)return false;
@@ -141,7 +165,7 @@ export class Game {
     return false;
   }
   setHome(x,y){
-    if(!this.paused)return false;
+    if(!this.paused||!this.isUnlocked("return"))return false;
     const d=dist({x,y},GATE);
     if(d<65||x<60||x>W-60||y<45||y>H-45)return false;
     this.save.home={x,y};
@@ -154,7 +178,7 @@ export class Game {
   }
   closeHangar(){this.paused=false;}
   equip(slot,id){
-    if(!this.paused)return false;
+    if(!this.paused||!this.canEquip(slot))return false;
     if(!PARTS[slot]?.some(p=>p.id===id))return false;
     if(!this.save.owned.includes(id+":"+slot))return false;
     const hpRatio=this.robot.hp/this.robot.maxHp;
@@ -167,7 +191,8 @@ export class Game {
   craft(slot,id){
     if(!this.paused)return false;
     const p=PARTS[slot]?.find(p=>p.id===id);
-    if(!p||!p.cost||this.save.owned.includes(id+":"+slot)||this.save.material<p.cost)return false;
+    if(!p||!this.isUnlocked("advancedParts")||!this.canEquip(slot)||
+      !p.cost||this.save.owned.includes(id+":"+slot)||this.save.material<p.cost)return false;
     this.save.material-=p.cost;
     this.save.owned.push(id+":"+slot);
     this.log(p.name+" を製造しました。");
@@ -176,7 +201,7 @@ export class Game {
   research(id){
     if(!this.paused)return false;
     const r=RESEARCH.find(r=>r.id===id);
-    if(!r||this.save.research.includes(id)||this.save.data<r.cost)return false;
+    if(!r||!this.canResearch(id)||this.save.research.includes(id)||this.save.data<r.cost)return false;
     this.save.data-=r.cost;
     this.save.research.push(id);
     if(id==="gate")this.gateHP+=50;
@@ -187,7 +212,7 @@ export class Game {
     return (this.save.facilities.turret?2:0)+(this.save.facilities.mineW?1:0)+(this.save.facilities.mineE?1:0);
   }
   toggleFacility(id){
-    if(!this.paused||!["turret","mineW","mineE"].includes(id))return false;
+    if(!this.paused||!["turret","mineW","mineE"].includes(id)||!this.canFacility(id))return false;
     if(!this.save.facilities[id]){
       const cost=id==="turret"?2:1;
       if(this.capacityUsed()+cost>this.stats().budget)return false;
@@ -196,7 +221,7 @@ export class Game {
     return true;
   }
   advanceStory(){
-    if(!this.paused||this.save.tier!==1||this.save.totalKills<12)return false;
+    if(!this.paused||this.save.tier!==1||!this.isUnlocked("story"))return false;
     this.save.tier=2;
     this.log("物語が進行。新しい敵と侵攻方向が加わりました。");
     return true;
@@ -224,6 +249,9 @@ export class Game {
     const movement={action:null,target:null};
     let shotTarget=null;
     slots.forEach((cmd,i)=>{
+      if(!this.canCondition(cmd.condition)||!this.canAction(cmd.action)){
+        statuses[i]={text:"機能の解放待ち",active:false};return;
+      }
       if(!validPair(cmd.condition,cmd.action)){statuses[i]={text:"無効な組合せ",active:false};return;}
       const match=this.candidates(cmd.condition);
       if(!match.match){delete this.locks[i];return;}
@@ -277,9 +305,13 @@ export class Game {
     e.dead=true;this.kills++;this.save.totalKills++;
     this.save.data++;
     if(this.save.totalKills%2===0)this.save.material++;
+    const unlocked=UNLOCKS.find(u=>u.kills===this.save.totalKills);
+    if(unlocked){
+      this.unlockNotice=unlocked;
+      this.log("新機能「"+unlocked.name+"」が解放！");
+    }
     this.effects.push({type:"kill",x:e.x,y:e.y,life:.45});
-    if(this.kills===1)this.log("敵を撃破。解析データを獲得しました。");
-    if(this.save.totalKills===12&&this.save.tier===1)this.log("新しい物語が解放。格納庫から任意に進行できます。");
+    if(this.kills===1&&!unlocked)this.log("敵を撃破。解析データを獲得しました。");
   }
   spawn(){
     if(this.enemies.filter(e=>!e.dead).length>=12)return;
@@ -354,14 +386,14 @@ export class Game {
       this.active=this.active.map(()=>({text:"機体停止",active:false}));
       this.used={move:null,weapon:null};
     }
-    if(this.save.facilities.turret&&this.turretWait<=0){
+    if(this.canFacility("turret")&&this.save.facilities.turret&&this.turretWait<=0){
       const origin={x:GATE.x+72,y:GATE.y-42};
       const tgt=this.enemies.filter(e=>!e.dead&&dist(e,origin)<=152)
         .sort((a,b)=>dist(a,GATE)-dist(b,GATE)||a.id-b.id)[0];
       if(tgt){this.fire(origin,tgt,22,true);this.turretWait=1.4;}
     }
     for(const id of ["mineW","mineE"]){
-      if(!this.save.facilities[id])continue;
+      if(!this.canFacility(id)||!this.save.facilities[id])continue;
       const p=id==="mineW"?{x:GATE.x-98,y:GATE.y+35}:{x:GATE.x+95,y:GATE.y+35};
       const targets=this.enemies.filter(e=>!e.dead&&dist(e,p)<30);
       if(targets.length){

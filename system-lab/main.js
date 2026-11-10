@@ -1,4 +1,4 @@
-import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, W, H, GATE, validPair} from "./sim.js";
+import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, W, H, GATE, validPair} from "./sim.js?v=unlock-1";
 
 const STORAGE_KEY="clockwork-system-lab-v1";
 let saved={};
@@ -6,7 +6,8 @@ try { saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}"); } catch(_) {}
 const game=new Game(saved);
 const el=id=>document.getElementById(id);
 const canvas=el("field"),ctx=canvas.getContext("2d");
-let activeTab="parts",lastFrame=performance.now(),uiTick=0,saveTick=0;
+let activeTab=game.isUnlocked("parts")?"parts":"research",lastFrame=performance.now(),uiTick=0,saveTick=0;
+let lastChoiceKills=-1,resetArmed=false;
 const facilityNames={turret:"自動砲台",mineW:"西側地雷",mineE:"東側地雷"};
 const facilityDescriptions={
   turret:"封鎖扉の右隣に設置。射程内の敵へ自動射撃（建設資源 2）",
@@ -18,32 +19,74 @@ function persist(){
 }
 for(let i=0;i<2;i++){
   const condition=el("condition-"+i),action=el("action-"+i);
-  CONDITIONS.forEach(([id,name])=>condition.add(new Option(name,id)));
-  ACTIONS.forEach(([id,name])=>action.add(new Option(name,id)));
-  condition.value=game.save.slots[i].condition;
-  action.value=game.save.slots[i].action;
   const changed=()=>{
-    game.updateCommand(i,condition.value,action.value);
+    if(!game.updateCommand(i,condition.value,action.value)){
+      renderCommandOptions();
+      return;
+    }
     game.locks={};
     persist();refresh();
   };
   condition.addEventListener("change",changed);
   action.addEventListener("change",changed);
 }
+function renderCommandOptions(){
+  for(let i=0;i<2;i++){
+    const cmd=game.save.slots[i];
+    for(const [select,list,enabled,current] of [
+      [el("condition-"+i),CONDITIONS,c=>game.canCondition(c[0]),cmd.condition],
+      [el("action-"+i),ACTIONS,a=>game.canAction(a[0]),cmd.action]
+    ]){
+      select.replaceChildren();
+      for(const [id,label] of list){
+        if(enabled([id,label]))select.add(new Option(label,id));
+      }
+      if(!Array.from(select.options).some(option=>option.value===current)){
+        const label=list.find(([id])=>id===current)?.[1]||current;
+        const old=new Option(label+"（未解放・変更してね）",current);
+        old.disabled=true;select.add(old);
+      }
+      select.value=current;
+    }
+  }
+}
+renderCommandOptions();
+function updateHangarTabs(){
+  document.querySelectorAll("[data-tab]").forEach(button=>
+    button.classList.toggle("on",button.dataset.tab===activeTab));
+}
+function dismissUnlock(){
+  game.unlockNotice=null;
+  el("unlock-notice").hidden=true;
+}
+el("unlock-dismiss").addEventListener("click",dismissUnlock);
+el("unlock-try").addEventListener("click",()=>{
+  const notice=game.unlockNotice;
+  if(!notice)return;
+  if(notice.tab==="command"){
+    document.querySelector(".control-zone").scrollIntoView({behavior:"smooth",block:"start"});
+  }else{
+    activeTab=notice.tab;
+    setHangar(true);
+  }
+  dismissUnlock();
+});
 function setHangar(open){
   if(game.defeated)return;
   if(open)game.openHangar(); else game.closeHangar();
   el("modal").hidden=!game.paused;
   el("pause-stamp").hidden=!game.paused;
   el("hangar-toggle").textContent=game.paused?"格納庫を閉じる":"格納庫を開く";
-  if(game.paused)renderHangar();
+  if(game.paused){updateHangarTabs();renderHangar();}
+  else resetArmed=false;
   refresh();
 }
 el("hangar-toggle").addEventListener("click",()=>setHangar(!game.paused));
 el("hangar-close").addEventListener("click",()=>setHangar(false));
 document.querySelectorAll("[data-tab]").forEach(button=>button.addEventListener("click",()=>{
   activeTab=button.dataset.tab;
-  document.querySelectorAll("[data-tab]").forEach(b=>b.classList.toggle("on",b===button));
+  resetArmed=false;
+  updateHangarTabs();
   renderHangar();
 }));
 document.addEventListener("keydown",e=>{
@@ -81,34 +124,80 @@ function renderHangar(){
   if(activeTab==="parts"){
     b.innerHTML='<div class="parts-grid">'+Object.entries(PARTS).map(([slot,parts])=>{
       const title={weapon:"武器",legs:"脚",sensor:"センサー",armor:"装甲"}[slot];
-      return '<section class="parts-group"><h3>'+title+'</h3>'+parts.map(p=>{
-        const owned=s.owned.includes(p.id+":"+slot);
-        const equipped=s.installed[slot]===p.id;
-        const label=equipped?'装備中':owned?'換装':"製造 "+p.cost+" 素材";
-        const kind=owned?"equip":"craft";
-        const disabled=equipped||(!owned&&s.material<p.cost);
-        return '<div class="part-row"><div><strong>'+p.name+'</strong><small>'+p.note+'</small></div>'+actButton(label,kind,p.id,slot,disabled,equipped?"equipped":"")+'</div>';
-      }).join("")+'</section>';
+      const threshold=game.unlockAt(["weapon","legs"].includes(slot)?"parts":"advancedParts");
+      if(!game.canEquip(slot)){
+        return '<section class="parts-group locked-feature"><h3>'+title+'</h3><p>累計'+threshold+'体撃破で換装できます。</p></section>';
+      }
+      return '<section class="parts-group"><h3>'+title+'</h3>'+
+        parts.filter(p=>p.owned||game.isUnlocked("advancedParts")).map(p=>{
+          const owned=s.owned.includes(p.id+":"+slot);
+          const equipped=s.installed[slot]===p.id;
+          const label=equipped?'装備中':owned?'換装':"製造 "+p.cost+" 素材";
+          const kind=owned?"equip":"craft";
+          const disabled=equipped||(!owned&&s.material<p.cost);
+          return '<div class="part-row"><div><strong>'+p.name+'</strong><small>'+p.note+'</small></div>'+
+            actButton(label,kind,p.id,slot,disabled,equipped?"equipped":"")+'</div>';
+        }).join("")+'</section>';
     }).join("")+'</div>';
   }else if(activeTab==="team"){
-    b.innerHTML='<div class="two-col"><section><h3>防衛設備</h3><p>設置中の設備が建設資源を消費。撤去すると枠が戻ります。地雷は使用すると消滅します。</p>'+
-      Object.entries(facilityNames).map(([id,name])=>{
-        const deployed=!!s.facilities[id],cost=id==="turret"?2:1;
-        return '<div class="facility-row"><div><strong>'+name+'</strong><small>'+facilityDescriptions[id]+'</small></div>'+actButton(deployed?"撤去":"設置","facility",id,"",!deployed&&game.capacityUsed()+cost>stats.budget)+'</div>';
-      }).join("")+'</section><section><h3>守備位置</h3><div class="home-map"><p>「戻る」コマンドの帰還地点です。位置を変えても、戦闘中の機体は瞬間移動しません。</p><p>現在： X '+Math.round(s.home.x)+' / Y '+Math.round(s.home.y)+'</p>'+
-      actButton("西側","home","west")+" "+actButton("南側","home","south")+" "+actButton("東側","home","east")+'</div><h3 style="margin-top:27px">編成</h3><p>試作は名称未定（二足）1機のみ。初期の合計2スロットは固定。複数機と機体追加のバランスは未決です。</p></section></div>';
+    const facilityRows=[];
+    if(game.isUnlocked("mines")){
+      for(const id of ["mineW","mineE"]){
+        const deployed=!!s.facilities[id],cost=1;
+        facilityRows.push('<div class="facility-row"><div><strong>'+facilityNames[id]+'</strong><small>'+
+          facilityDescriptions[id]+'</small></div>'+actButton(deployed?"撤去":"設置","facility",id,"",
+          !deployed&&game.capacityUsed()+cost>stats.budget)+'</div>');
+      }
+    }else facilityRows.push('<p class="locked-message">累計10体撃破で地雷が解放されます。</p>');
+    if(game.isUnlocked("turret")){
+      const deployed=!!s.facilities.turret;
+      facilityRows.push('<div class="facility-row"><div><strong>'+facilityNames.turret+'</strong><small>'+
+        facilityDescriptions.turret+'</small></div>'+actButton(deployed?"撤去":"設置","facility","turret","",
+        !deployed&&game.capacityUsed()+2>stats.budget)+'</div>');
+    }else facilityRows.push('<p class="locked-message">累計16体撃破で自動砲台が解放されます。</p>');
+    const home=s.home;
+    b.innerHTML='<div class="two-col"><section><h3>防衛設備</h3><p>設置中の設備が建設資源を消費。撤去すると枠が戻ります。</p>'+
+      facilityRows.join("")+'</section><section><h3>守備位置</h3>'+
+      (game.isUnlocked("return")?
+      '<div class="home-map"><p>「戻る」コマンドの帰還地点です。位置変更で瞬間移動はしません。</p>'+
+      '<p>現在： X '+Math.round(home.x)+' / Y '+Math.round(home.y)+'</p>'+
+      actButton("西側","home","west")+" "+actButton("南側","home","south")+" "+actButton("東側","home","east")+'</div>':
+      '<p class="locked-message">累計2体撃破で守備位置の変更が解放されます。</p>')+
+      '<h3 style="margin-top:24px">編成</h3><p>初期二足1機・合計2スロットは固定。多機編成はこの試作の対象外です。</p></section></div>';
   }else{
-    b.innerHTML='<div class="two-col"><section><h3>恒久研究</h3><p>解析データを使って能力を強化します。敗北時の回収分も残ります。</p><div class="research-list">'+RESEARCH.map(r=>{
-      const done=s.research.includes(r.id);
-      return '<div class="research-row"><div><strong>'+r.name+'</strong><small>'+r.description+'</small></div>'+actButton(done?"研究済":"研究 "+r.cost+" データ","research",r.id,"",done||s.data<r.cost)+'</div>';
-    }).join("")+'</div></section><section><h3>物語の進行</h3><p>一定数の敵を倒すと次の物語が解放されます。解放しただけでは敵は強化されません。</p><div class="tab-story"><h3>'+(s.tier===1?"次の敵帯":"敵帯 02 に到達")+'</h3><p class="'+(s.totalKills>=12?"story-ready":"")+'">'+(s.tier===2?"次の敵帯で戦闘中。複数方向と追加の敵が出現します。":"累計 "+s.totalKills+" / 12 体撃破で解放（この試作の仮閾値）")+'</p>'+
-      (s.tier===1?actButton("次の物語へ進む","story","advance","",s.totalKills<12):"")+'</div><p>進行後も戦闘は同じ世界で継続します。独立ステージやクリア画面はありません。</p></section></div>';
+    b.innerHTML='<div class="two-col"><section><h3>恒久研究</h3><p>敗北でも解析データを持ち帰れます。基本の火力研究は最初から利用可能です。</p><div class="research-list">'+
+      RESEARCH.filter(r=>game.canResearch(r.id)).map(r=>{
+        const done=s.research.includes(r.id);
+        return '<div class="research-row"><div><strong>'+r.name+'</strong><small>'+r.description+'</small></div>'+
+          actButton(done?"研究済":"研究 "+r.cost+" データ","research",r.id,"",done||s.data<r.cost)+'</div>';
+      }).join("")+'</div>'+
+      (!game.isUnlocked("mines")?'<p class="locked-message">累計10体で封鎖扉補強の研究が解放されます。</p>':'')+
+      (!game.isUnlocked("turret")?'<p class="locked-message">累計16体で建設資源拡張の研究が解放されます。</p>':'')+
+      '</section><section><h3>物語の進行</h3><p>物語を進めるまでは、同じレベル帯の敵が出続けます。</p>'+
+      '<div class="tab-story"><h3>'+(s.tier===1?"次の敵帯":"敵帯 02 に到達")+'</h3><p class="'+
+      (game.isUnlocked("story")?"story-ready":"")+'">'+
+      (s.tier===2?"新しい敵と侵攻方向が加わりました。":"累計 "+s.totalKills+" / 12 体撃破で解放（試作用の仮値）")+'</p>'+
+      (s.tier===1?actButton("次の物語へ進む","story","advance","",!game.isUnlocked("story")):"")+
+      '</div><p>解放しても敵帯は勝手に変わりません。</p>'+
+      '<div class="reset-progress">'+actButton(resetArmed?"本当に進行を初期化する？":"最初から解放を試す","reset","all","",false,resetArmed?"armed":"")+
+      '<small>'+(resetArmed?"もう一度押すとこの試作のセーブを消去します。":"この試作のセーブだけを初期化できます。")+'</small></div>'+
+      '</section></div>';
   }
 }
 el("hangar-body").addEventListener("click",e=>{
   const target=e.target.closest("button[data-kind]");
   if(!target)return;
   const {kind,id,slot}=target.dataset;
+  if(kind==="reset"){
+    if(resetArmed){
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }else{
+      resetArmed=true;
+      renderHangar();
+    }
+    return;
+  }
   let changed=false;
   if(kind==="equip")changed=game.equip(slot,id);
   if(kind==="craft")changed=game.craft(slot,id);
@@ -119,10 +208,24 @@ el("hangar-body").addEventListener("click",e=>{
     const choices={west:{x:315,y:285},south:{x:475,y:418},east:{x:626,y:285}};
     changed=game.setHome(choices[id].x,choices[id].y);
   }
-  if(changed){persist();renderHangar();refresh();}
+  if(changed){resetArmed=false;persist();renderHangar();refresh();}
 });
 function refresh(){
   const s=game.snapshot(),st=s.stats;
+  if(lastChoiceKills!==s.totalKills){
+    renderCommandOptions();
+    lastChoiceKills=s.totalKills;
+  }
+  const next=game.nextUnlock();
+  el("unlock-next").textContent=next?"次の解放："+next.name:"すべての機能を解放済み";
+  el("unlock-count").textContent=next?s.totalKills+" / "+next.kills+"体":"達成";
+  el("unlock-progress-bar").style.width=(next?Math.min(100,s.totalKills/next.kills*100):100)+"%";
+  const notice=game.unlockNotice;
+  el("unlock-notice").hidden=!notice;
+  if(notice){
+    el("unlock-title").textContent="新機能解放："+notice.name;
+    el("unlock-detail").textContent=notice.detail;
+  }
   el("gate-value").textContent=Math.ceil(s.gateHP)+" / "+st.gateHp;
   el("gate-overlay").textContent=Math.ceil(s.gateHP);
   el("gate-value").style.color=s.gateHP/st.gateHp<.4?"#f08472":"";
@@ -141,9 +244,13 @@ function refresh(){
   ].map(([label,value])=>'<div><span>'+label+'</span><b>'+value+'</b></div>').join("");
   for(let i=0;i<2;i++){
     const status=s.active[i],row=document.querySelector('.command-row[data-index="'+i+'"]');
-    const invalid=!validPair(game.save.slots[i].condition,game.save.slots[i].action);
+    const invalid=!validPair(game.save.slots[i].condition,game.save.slots[i].action)||
+      !game.canCondition(game.save.slots[i].condition)||!game.canAction(game.save.slots[i].action);
     el("status-"+i).textContent=status.text;
     el("invalid-"+i).hidden=!invalid;
+    el("invalid-"+i).textContent=(!game.canCondition(game.save.slots[i].condition)||
+      !game.canAction(game.save.slots[i].action))?"まだ解放されていない命令です。別の命令へ変更するか、敵を倒して解放してください。":
+      "この条件には「戻る」または「停止」だけ登録できます。";
     row.classList.toggle("running",status.active&&!s.paused&&!s.defeated);
     row.classList.toggle("invalid-row",invalid);
   }
@@ -256,7 +363,9 @@ function draw(){
 }
 function frame(now){
   const dt=Math.min(.06,(now-lastFrame)/1000);lastFrame=now;
+  const previousKills=game.save.totalKills;
   game.step(dt);
+  if(game.save.totalKills!==previousKills)persist();
   draw();
   uiTick+=dt;saveTick+=dt;
   if(uiTick>.17){refresh();uiTick=0;}
