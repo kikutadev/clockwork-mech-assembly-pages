@@ -31,3 +31,14 @@
     box-shadow:0 10px 28px #07140dcc;
   }
 }
+
+/* Explicit first-command lesson and expandable command program. */
+.tutorial{border:1px solid #b08f53;background:#332d20;padding:13px 14px;margin:0 0 19px;color:#eed7a3}
+.tutorial[hidden]{display:none}
+.tutorial strong{font-size:12px;letter-spacing:.03em}
+.tutorial p{font-size:12px;color:#d8c7a6;line-height:1.65;margin:7px 0 0}
+.commands{grid-template-columns:1fr}
+@media(min-width:630px) and (max-width:880px){.commands{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.tactic-hint{font-size:11px;line-height:1.65;color:#aadbd8;background:#12323a;border-left:3px solid #61afb4;padding:10px 11px;margin:13px 0 2px}
+.tactic-hint[hidden]{display:none}

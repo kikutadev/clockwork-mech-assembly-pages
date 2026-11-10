@@ -1,13 +1,13 @@
-import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, UNLOCKS, W, H, GATE, validPair} from "./sim.js?v=unlock-2";
+import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, UNLOCKS, W, H, GATE, validPair} from "./sim.js?v=tactics-1";
 
-const STORAGE_KEY="clockwork-system-lab-v1";
+const STORAGE_KEY="clockwork-system-lab-v2";
 let saved={};
 try { saved=JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}"); } catch(_) {}
 const game=new Game(saved);
 const el=id=>document.getElementById(id);
 const canvas=el("field"),ctx=canvas.getContext("2d");
 let activeTab=game.isUnlocked("parts")?"parts":"research",lastFrame=performance.now(),uiTick=0,saveTick=0;
-let lastChoiceKills=-1,resetArmed=false;
+let lastChoiceKills=-1,lastWeapon="",renderedSlotCount=0,resetArmed=false;
 const facilityNames={turret:"自動砲台",mineW:"西側地雷",mineE:"東側地雷"};
 const facilityDescriptions={
   turret:"封鎖扉の右隣に設置。射程内の敵へ自動射撃（建設資源 2）",
@@ -17,33 +17,45 @@ const facilityDescriptions={
 function persist(){
   try {localStorage.setItem(STORAGE_KEY,JSON.stringify(game.exportSave()));}catch(_){}
 }
-for(let i=0;i<2;i++){
-  const condition=el("condition-"+i),action=el("action-"+i);
-  const changed=()=>{
-    if(!game.updateCommand(i,condition.value,action.value)){
-      renderCommandOptions();
-      return;
-    }
-    game.locks={};
-    persist();refresh();
-  };
-  condition.addEventListener("change",changed);
-  action.addEventListener("change",changed);
-}
+el("commands").addEventListener("change",e=>{
+  const select=e.target.closest("select[data-index]");
+  if(!select)return;
+  const i=Number(select.dataset.index);
+  const condition=el("condition-"+i).value,action=el("action-"+i).value;
+  if(!game.updateCommand(i,condition,action)){
+    renderCommandOptions();
+    return;
+  }
+  game.locks={};
+  persist();refresh();
+});
 function renderCommandOptions(){
-  for(let i=0;i<2;i++){
+  const count=game.save.slots.length;
+  if(renderedSlotCount!==count){
+    el("commands").innerHTML=game.save.slots.map((cmd,i)=>
+      '<article class="command-row" data-index="'+i+'"><div class="command-head"><span>'+String(i+1).padStart(2,"0")+
+      (i===0?' <b>優先</b>':'')+'</span><span class="run-status" id="status-'+i+'">判定待ち</span></div>'+
+      '<label>条件<select id="condition-'+i+'" data-index="'+i+'"></select></label>'+
+      '<label>行動<select id="action-'+i+'" data-index="'+i+'"></select></label>'+
+      '<div class="invalid" id="invalid-'+i+'" hidden></div></article>'
+    ).join("");
+    renderedSlotCount=count;
+  }
+  el("slot-capacity").textContent=count+" / "+count;
+  for(let i=0;i<count;i++){
     const cmd=game.save.slots[i];
     for(const [select,list,enabled,current] of [
       [el("condition-"+i),CONDITIONS,c=>game.canCondition(c[0]),cmd.condition],
       [el("action-"+i),ACTIONS,a=>game.canAction(a[0]),cmd.action]
     ]){
       select.replaceChildren();
+      select.add(new Option("— 未設定 —",""));
       for(const [id,label] of list){
         if(enabled([id,label]))select.add(new Option(label,id));
       }
-      if(!Array.from(select.options).some(option=>option.value===current)){
+      if(current&&!Array.from(select.options).some(option=>option.value===current)){
         const label=list.find(([id])=>id===current)?.[1]||current;
-        const old=new Option(label+"（未解放・変更してね）",current);
+        const old=new Option(label+"（未解放／装備不適合）",current);
         old.disabled=true;select.add(old);
       }
       select.value=current;
@@ -129,7 +141,7 @@ function renderHangar(){
         return '<section class="parts-group locked-feature"><h3>'+title+'</h3><p>累計'+threshold+'体撃破で換装できます。</p></section>';
       }
       return '<section class="parts-group"><h3>'+title+'</h3>'+
-        parts.filter(p=>p.owned||game.isUnlocked("advancedParts")).map(p=>{
+        parts.filter(p=>p.owned||game.isUnlocked(slot==="weapon"?"parts":"advancedParts")).map(p=>{
           const owned=s.owned.includes(p.id+":"+slot);
           const equipped=s.installed[slot]===p.id;
           const label=equipped?'装備中':owned?'換装':"製造 "+p.cost+" 素材";
@@ -212,9 +224,18 @@ el("hangar-body").addEventListener("click",e=>{
 });
 function refresh(){
   const s=game.snapshot(),st=s.stats;
-  if(lastChoiceKills!==s.totalKills){
+  if(lastChoiceKills!==s.totalKills||lastWeapon!==game.save.installed.weapon){
     renderCommandOptions();
     lastChoiceKills=s.totalKills;
+    lastWeapon=game.save.installed.weapon;
+  }
+  const tutorial=el("tutorial");
+  tutorial.hidden=s.started;
+  if(!s.started){
+    el("tutorial-title").textContent=game.save.tutorialMoved?"02 / コマンドを組む":"01 / ロボットを移動させる";
+    el("tutorial-text").textContent=game.save.tutorialMoved?
+      "条件と行動を自分で選択。射撃命令を登録すると最初の敵が現れます。移動命令も組み合わせてください。":
+      "戦場のロボットをタップしてから、西側の地面をタップ。移動が終わるまで敵は現れません。";
   }
   const next=game.nextUnlock();
   el("unlock-next").textContent=next?"次の解放："+next.name:"すべての機能を解放済み";
@@ -239,20 +260,32 @@ function refresh(){
   el("enemy-value").textContent=s.enemyCount;
   el("tier-label").textContent=s.tier===1?"敵帯 01 · 西側侵入":"敵帯 02 · 多方向侵入";
   el("event-text").textContent=game.lastAction;
-  el("battle-status").textContent=s.defeated?"封鎖扉破壊":s.paused?"戦場の時間を停止しています。":game.robot.hp<=0?"機体が停止。封鎖扉を守れません。":game.robot.manual?"一時移動中。射撃は並行実行します。":"命令による自律防衛中。編集は即時反映。";
+  el("battle-status").textContent=s.defeated?"封鎖扉破壊":s.paused?"戦場の時間を停止しています。":!game.save.started?"指示待ち：最初の移動と射撃命令の登録後に敵が出現。":game.robot.hp<=0?"機体が停止。封鎖扉を守れません。":game.robot.manual?"一時移動中。射撃は並行実行します。":"命令による自律防衛中。編集は即時反映。";
   el("move-owner").textContent=game.robot.manual?"手動":s.used.move===null?"—":"0"+(s.used.move+1);
   el("shoot-owner").textContent=s.used.weapon===null?"—":"0"+(s.used.weapon+1);
+  const hint=el("tactic-hint");
+  hint.hidden=!game.isUnlocked("parts");
+  if(!hint.hidden){
+    const texts={basic:"標準砲｜制圧射撃：軽いダメージで3.5秒減速。足止めして他の敵を処理できる。",
+      long:"長砲身｜貫通射撃：一直線の敵を同時攻撃。厚い装甲も無視する。",
+      rapid:"速射砲｜散射：命中点の周囲65を攻撃。密集時に強く、単独相手には通常射撃が速い。"};
+    hint.textContent=texts[game.save.installed.weapon];
+  }
   el("stats").innerHTML=[
     ["索敵",Math.round(st.detect)],["射程",Math.round(st.range)],["移動速度",Math.round(st.speed)],["威力",st.damage],["射撃間隔",st.interval+" 秒"],["機体HP",Math.ceil(game.robot.hp)+" / "+st.hp]
   ].map(([label,value])=>'<div><span>'+label+'</span><b>'+value+'</b></div>').join("");
-  for(let i=0;i<2;i++){
-    const status=s.active[i],row=document.querySelector('.command-row[data-index="'+i+'"]');
-    const invalid=!validPair(game.save.slots[i].condition,game.save.slots[i].action)||
-      !game.canCondition(game.save.slots[i].condition)||!game.canAction(game.save.slots[i].action);
+  for(let i=0;i<game.save.slots.length;i++){
+    const status=s.active[i]||{text:"未設定",active:false};
+    const row=document.querySelector('.command-row[data-index="'+i+'"]');
+    const cmd=game.save.slots[i];
+    const unconfigured=!cmd.condition||!cmd.action;
+    const unavailable=(cmd.condition&&!game.canCondition(cmd.condition))||
+      (cmd.action&&!game.canAction(cmd.action));
+    const invalid=!unconfigured&&(!validPair(cmd.condition,cmd.action)||unavailable);
     el("status-"+i).textContent=status.text;
     el("invalid-"+i).hidden=!invalid;
-    el("invalid-"+i).textContent=(!game.canCondition(game.save.slots[i].condition)||
-      !game.canAction(game.save.slots[i].action))?"まだ解放されていない命令です。別の命令へ変更するか、敵を倒して解放してください。":
+    el("invalid-"+i).textContent=unavailable?
+      "未解放、または今の武器では使用できない行動です。装備・命令を見直してください。":
       "この条件には「戻る」または「停止」だけ登録できます。";
     row.classList.toggle("running",status.active&&!s.paused&&!s.defeated);
     row.classList.toggle("invalid-row",invalid);
@@ -326,12 +359,19 @@ function draw(){
   ctx.fillStyle="#9ed1bd";ctx.font="10px monospace";ctx.fillText("H",home.x+14,home.y-9);
   for(const e of game.enemies){
     const specs={crawler:{color:"#b47b63",radius:12},swift:{color:"#d39a65",radius:9},armored:{color:"#9c7772",radius:16}}[e.kind];
-    circle(e.x,e.y,Math.max(5,specs.radius+5),"#d7805744",null,1);
+    circle(e.x,e.y,Math.max(5,specs.radius+5),e.kind==="armored"?"#b4aec060":"#d7805744",null,1);
+    if(e.slowTimer>0)circle(e.x,e.y,specs.radius+9,"#7ad5d7",null,2);
     ctx.save();ctx.translate(e.x,e.y);
     const theta=Math.atan2(g.y-e.y,g.x-e.x);ctx.rotate(theta);
     ctx.fillStyle=specs.color;ctx.strokeStyle="#342b2a";ctx.lineWidth=2;
     ctx.beginPath();ctx.moveTo(specs.radius,0);ctx.lineTo(-specs.radius*.8,-specs.radius*.75);ctx.lineTo(-specs.radius*.5,0);ctx.lineTo(-specs.radius*.8,specs.radius*.75);ctx.closePath();ctx.fill();ctx.stroke();
     ctx.restore();
+    if(e.kind!=="crawler"){
+      ctx.font="bold 13px sans-serif";ctx.textAlign="center";
+      ctx.fillStyle=e.kind==="swift"?"#f6d19b":"#e7b5ca";
+      ctx.fillText(e.kind==="swift"?"速":"甲",0,-specs.radius-19);
+      ctx.textAlign="start";
+    }
     ctx.fillStyle="#271f1d";ctx.fillRect(e.x-14,e.y-specs.radius-14,28,3);
     ctx.fillStyle="#dc9a78";ctx.fillRect(e.x-14,e.y-specs.radius-14,28*Math.max(0,e.hp/e.maxHp),3);
   }
@@ -354,11 +394,18 @@ function draw(){
   ctx.fillStyle="#233034";ctx.fillRect(robot.x-25,robot.y-33,50,4);
   ctx.fillStyle="#93c5ad";ctx.fillRect(robot.x-25,robot.y-33,50*Math.max(0,robot.hp/robot.maxHp),4);
   for(const bullet of game.bullets){
-    circle(bullet.x,bullet.y,bullet.fromTurret?4:5,null,bullet.fromTurret?"#f3b283":"#f6df97");
+    circle(bullet.x,bullet.y,bullet.mode==="scatter"?7:bullet.fromTurret?4:5,null,
+      bullet.mode==="suppress"?"#77e2d4":bullet.mode==="scatter"?"#f6a46b":bullet.fromTurret?"#f3b283":"#f6df97");
   }
   for(const effect of game.effects){
-    const r=effect.type==="mine"?50*(1-effect.life/.7)+5:effect.type==="kill"?30*(1-effect.life/.45)+5:11;
-    circle(effect.x,effect.y,r,effect.type==="mine"?"#f5cb8c":effect.type==="kill"?"#e8b686":"#e9e5c4",null,3);
+    const r=effect.type==="scatter"?67*(1-effect.life/.48)+4:
+      effect.type==="pierce"?34*(1-effect.life/.3)+5:
+      effect.type==="mine"?50*(1-effect.life/.7)+5:
+      effect.type==="kill"?30*(1-effect.life/.45)+5:11;
+    const color=effect.type==="scatter"?"#ffa976":effect.type==="pierce"?"#dbedff":
+      effect.type==="suppress"?"#75dbdd":effect.type==="mine"?"#f5cb8c":
+      effect.type==="kill"?"#e8b686":"#e9e5c4";
+    circle(effect.x,effect.y,r,color,null,effect.type==="pierce"?5:3);
   }
   // Show the actual dynamic position of the unit label.
   el("unit-label").style.left=(robot.x/W*100)+"%";
@@ -367,8 +414,9 @@ function draw(){
 function frame(now){
   const dt=Math.min(.06,(now-lastFrame)/1000);lastFrame=now;
   const previousKills=game.save.totalKills;
+  const previousTutorial=game.save.tutorialMoved;
   game.step(dt);
-  if(game.save.totalKills!==previousKills)persist();
+  if(game.save.totalKills!==previousKills||game.save.tutorialMoved!==previousTutorial)persist();
   draw();
   uiTick+=dt;saveTick+=dt;
   if(uiTick>.17){refresh();uiTick=0;}

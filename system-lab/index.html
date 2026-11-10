@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0e151b">
 <title>CLOCKWORK DEFENSE — SYSTEM LAB</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./style.css?v=unlock-2">
+<link rel="stylesheet" href="./style.css?v=tactics-1">
 </head>
 <body>
 <header class="topbar">
@@ -30,7 +30,7 @@
       <div id="pause-stamp" class="pause-stamp" hidden>世界停止中</div>
     </div>
     <div class="battle-foot">
-      <p id="battle-status">登録したコマンドが自動で動きます。</p>
+      <p id="battle-status">まず機体を西へ移動させてください。</p>
       <div class="legend"><span><i class="swatch friendly"></i>機体</span><span><i class="swatch hostile"></i>魔物</span><span><i class="swatch detection"></i>索敵</span><span><i class="swatch weapon"></i>射程</span></div>
     </div>
     <div class="unlock-notice" id="unlock-notice" role="status" aria-live="polite" hidden>
@@ -41,16 +41,15 @@
     <div class="event-line"><span>直近の出来事</span><p id="event-text">防衛開始</p></div>
   </section>
   <aside class="control-zone">
-    <div class="section-heading"><div><small>UNIT 01 / COMMAND</small><h1>名称未定（二足）</h1></div><span class="capacity">2 / 2</span></div>
+    <div class="section-heading"><div><small>UNIT 01 / COMMAND</small><h1>名称未定（二足）</h1></div><span class="capacity" id="slot-capacity">2 / 2</span></div>
     <p class="intro">条件を満たすたび、ロボットが自分で判断します。行を変えると戦闘にすぐ反映。</p>
+    <div class="tutorial" id="tutorial"><strong id="tutorial-title">01 / ロボットを移動させる</strong><p id="tutorial-text">機体をタップ→西側地面をタップ。移動後に命令を組みます。</p></div>
     <div class="unlock-track" aria-live="polite">
       <div class="unlock-track-top"><strong id="unlock-next">次の解放</strong><span id="unlock-count">0 / 2体</span></div>
       <div class="unlock-progress"><span id="unlock-progress-bar"></span></div>
     </div>
-    <div class="commands" id="commands">
-      <article class="command-row" data-index="0"><div class="command-head"><span>01 <b>優先</b></span><span class="run-status" id="status-0">判定待ち</span></div><label>条件<select id="condition-0"></select></label><label>行動<select id="action-0"></select></label><div class="invalid" id="invalid-0" hidden>この条件には「戻る」または「停止」だけ登録できます。</div></article>
-      <article class="command-row" data-index="1"><div class="command-head"><span>02</span><span class="run-status" id="status-1">判定待ち</span></div><label>条件<select id="condition-1"></select></label><label>行動<select id="action-1"></select></label><div class="invalid" id="invalid-1" hidden>この条件には「戻る」または「停止」だけ登録できます。</div></article>
-    </div>
+    <div class="commands" id="commands"></div>
+    <div class="tactic-hint" id="tactic-hint" hidden></div>
     <div class="explanation"><div class="explanation-title">実行のしくみ</div><p><b>上の行を優先</b>します。同じ装置なら1件だけ、<b>移動と射撃は同時</b>に動きます。条件が続く間は繰り返し。</p><div class="device-readout"><span>移動 <b id="move-owner">—</b></span><span>射撃 <b id="shoot-owner">—</b></span></div></div>
     <div class="stats-block"><h2>現在の機体性能 <small>装備で変化</small></h2><div class="stat-rows" id="stats"></div></div>
     <div class="quick-help"><span class="keycap">1</span>機体を選ぶ　<span class="keycap">H</span>格納庫　<span class="keycap">Esc</span>選択解除</div>
@@ -66,6 +65,6 @@
 </div>
 <div id="defeat-modal" class="overlay" hidden><div class="defeat-box"><span class="red-eyebrow">DEFENSE LOST</span><h2>封鎖扉が破壊されました</h2><p>今回の失敗からも、次の防衛のための資源が残ります。</p><div class="result-metrics"><div><span>今回の撃破</span><b id="result-kills">0</b></div><div><span>解析データ</span><b id="result-data">0</b></div><div><span>強化素材</span><b id="result-material">0</b></div></div><button id="retry" class="primary">引き継いで再挑戦</button><small>コマンド・パーツ・研究・累計撃破数は維持されます</small></div></div>
 <footer><span>試作値：射程・火力・敵密度・報酬は未確定です。ゲームシステムの検証専用。</span><span>既存Godot本編とは独立・仕様の正本ではありません。</span></footer>
-<script type="module" src="./main.js?v=unlock-2"></script>
+<script type="module" src="./main.js?v=tactics-1"></script>
 </body>
 </html>
