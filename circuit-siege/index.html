@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a1c"><link rel="icon" href="data:,">
+<title>CIRCUIT SIEGE — Programmable Defense</title><link rel="stylesheet" href="./style.css"></head>
+<body>
+<header class="header">
+  <div class="brand"><span class="sigil">◇</span><div><strong>CIRCUIT SIEGE</strong><small>PROGRAMMABLE TOWER DEFENSE</small></div></div>
+  <div class="hud">
+    <div class="hudstat hp"><span>コア耐久</span><b id="hp">110 / 110</b></div>
+    <div class="hudstat"><span>建設資金</span><b id="credits">250 <em>CR</em></b></div>
+    <div class="hudstat"><span>共有EN</span><b id="energy">80 <em>/ 80</em></b></div>
+    <div class="hudstat"><span>防衛波</span><b id="wave">01</b></div>
+    <div class="hudstat"><span>累計撃破</span><b id="kills">0</b></div>
+  </div>
+</header>
+<main class="layout">
+  <section class="arena">
+    <div class="section-bar"><div class="section-title"><span class="led"></span><b id="phase-title">建設フェーズ</b><span class="subtitle">二方向からコアを防衛</span></div><div class="small-stats"><span>残敵 <b id="remaining">0</b></span><span>最高 <b id="best-wave">0</b>波</span></div></div>
+    <div class="battle-frame">
+      <canvas id="board" width="1000" height="630" aria-label="戦場。建設点をタップして砲台を置き、砲台をタップして回路を設定"></canvas>
+      <div class="board-hint" id="board-hint">◎ の地点をタップして砲台を建設</div>
+      <div id="notice" class="notice" hidden role="status" aria-live="polite"><span class="notice-icon">✦</span><div><b id="notice-title">新回路解放</b><small id="notice-detail"></small></div><button id="notice-dismiss" aria-label="通知を閉じる">×</button></div>
+    </div>
+    <div class="build-toolbar">
+      <div class="build-label"><span>BUILD</span><strong>建設する砲台</strong></div>
+      <div id="build-choices" class="build-choices"></div>
+    </div>
+    <div class="wave-toolbar">
+      <div class="wave-text"><b id="wave-copy">第1波の侵攻に備える</b><span id="wave-info">配置と回路を準備して「侵攻開始」</span></div>
+      <div class="wave-actions">
+        <button id="pause" class="ghost" disabled>停止</button>
+        <button id="speed" class="ghost">×1</button>
+        <button id="start" class="primary">第1波を開始 <span>▶</span></button>
+      </div>
+    </div>
+    <div class="events"><span>戦況</span><b id="event">砲台の配置場所を選んでください。</b></div>
+  </section>
+  <aside class="sidebar">
+    <div class="inspector-head"><div><small>CONTROL CIRCUIT</small><h1 id="inspector-title">砲台を選択</h1></div><span id="inspector-level" class="unit-level">—</span></div>
+    <p class="sidebar-intro" id="inspector-desc">建設点を選ぶと、砲台ごとの動作を自由に組み立てられます。</p>
+    <div id="no-selection" class="intro-panel">
+      <div class="intro-step"><span>01</span><div><b>位置を決める</b><p>二本の侵攻路が合流する場所、片方だけを狙う場所などを選択。</p></div></div>
+      <div class="intro-step"><span>02</span><div><b>条件と技をつなぐ</b><p>「敵が密集 → 範囲攻撃」「標識のある敵 → 集中射撃」など。</p></div></div>
+      <div class="intro-step"><span>03</span><div><b>実戦で調整する</b><p>戦闘中も命令を変更できます。上の回路が優先されます。</p></div></div>
+    </div>
+    <div id="selected-panel" hidden>
+      <div class="tower-overview" id="tower-overview"></div>
+      <div class="preset-section"><span>QUICK CIRCUITS</span><div id="presets" class="presets"></div></div>
+      <div class="circuit-header"><b>優先回路</b><small>上から判定 / 発動できなければ次へ</small></div>
+      <div id="rules" class="rules"></div>
+      <div class="circuit-note"><span class="note-dot"></span>各砲台が独立して判定。技は共有ENを使います。命令が成立しない間は勝手に撃ちません。</div>
+      <div class="tower-controls"><button id="upgrade" class="secondary">砲台を強化</button><button id="sell" class="danger">回収</button></div>
+    </div>
+    <div class="tech-section"><div class="tech-head"><div><small>DISCOVERY</small><h2>解放できる回路</h2></div><span id="unlock-progress">0 / 12</span></div><div class="tech-meter"><span id="tech-fill"></span></div><div id="technology" class="technology"></div></div>
+    <div class="sidebar-bottom"><p>同じ2行でも、砲台の位置・狙う相手・技の組み合わせで結果が変わります。</p><button id="restart-run">防衛を最初からやり直す</button></div>
+  </aside>
+</main>
+<div id="defeat" class="overlay" hidden><div class="result"><span class="defeat-eyebrow">CORE BREACHED</span><h2>コアが突破されました</h2><p>砲台の配置や命令を変えて再挑戦。解放した回路と累計撃破は引き継ぎます。</p><div class="result-grid"><div><span>今回の撃破</span><b id="result-kills">0</b></div><div><span>到達した波</span><b id="result-wave">1</b></div><div><span>累計撃破</span><b id="result-total">0</b></div></div><button id="retry" class="primary">新しい配置で再挑戦</button></div></div>
+<footer><span>自動化のゲーム性を比較する独立試作。見た目・数値は検証用です。</span><span>既存のSystem Lab / Godot本編とは別作品扱い。</span></footer>
+<script type="module" src="./main.js"></script></body></html>
