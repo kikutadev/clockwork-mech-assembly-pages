@@ -28,16 +28,16 @@ export const PARTS = {
     {id:"heavy", name:"重装甲", cost:5, hp:170, speedFactor:.77, note:"耐久増加・移動低下"}
   ]
 };
-// Temporary System Lab unlock milestones; SPEC.md does not fix these kill counts.
+// Temporary System Lab milestones: progressively widening kill intervals, NOT adopted SPEC values.
 export const UNLOCKS = [
   {id:"return", kills:2, name:"自動帰還", detail:"「周囲に敵がいない→戻る／停止」と守備位置が使えます", tab:"command"},
-  {id:"parts", kills:4, name:"武器・脚の換装", detail:"長砲身・機動脚を選べます", tab:"parts"},
-  {id:"avoid", kills:6, name:"近接回避", detail:"「敵が近すぎる→離れる」を組めます", tab:"command"},
-  {id:"gate", kills:8, name:"昇降口優先", detail:"「敵が昇降口付近」を条件にできます", tab:"command"},
-  {id:"mines", kills:10, name:"防衛地雷", detail:"地雷の設置と封鎖扉の補強研究が使えます", tab:"team"},
-  {id:"story", kills:12, name:"次の物語", detail:"格納庫から任意に次の敵帯へ進めます", tab:"research"},
-  {id:"advancedParts", kills:14, name:"追加パーツ", detail:"センサー・装甲の換装と部品製造ができます", tab:"parts"},
-  {id:"turret", kills:16, name:"自動砲台", detail:"砲台の配置と建設資源拡張研究が使えます", tab:"team"}
+  {id:"parts", kills:10, name:"武器・脚の換装", detail:"長砲身・機動脚を選べます", tab:"parts"},
+  {id:"avoid", kills:24, name:"近接回避", detail:"「敵が近すぎる→離れる」を組めます", tab:"command"},
+  {id:"gate", kills:46, name:"昇降口優先", detail:"「敵が昇降口付近」を条件にできます", tab:"command"},
+  {id:"mines", kills:78, name:"防衛地雷", detail:"地雷の設置と封鎖扉の補強研究が使えます", tab:"team"},
+  {id:"story", kills:122, name:"次の物語", detail:"格納庫から任意に次の敵帯へ進めます", tab:"research"},
+  {id:"advancedParts", kills:180, name:"追加パーツ", detail:"センサー・装甲の換装と部品製造ができます", tab:"parts"},
+  {id:"turret", kills:256, name:"自動砲台", detail:"砲台の配置と建設資源拡張研究が使えます", tab:"team"}
 ];
 const CONDITION_UNLOCK = {clear:"return", close:"avoid", gate:"gate"};
 const ACTION_UNLOCK = {return:"return", hold:"return", retreat:"avoid"};

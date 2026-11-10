@@ -1,4 +1,4 @@
-import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, W, H, GATE, validPair} from "./sim.js?v=unlock-1";
+import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, UNLOCKS, W, H, GATE, validPair} from "./sim.js?v=unlock-2";
 
 const STORAGE_KEY="clockwork-system-lab-v1";
 let saved={};
@@ -148,13 +148,13 @@ function renderHangar(){
           facilityDescriptions[id]+'</small></div>'+actButton(deployed?"撤去":"設置","facility",id,"",
           !deployed&&game.capacityUsed()+cost>stats.budget)+'</div>');
       }
-    }else facilityRows.push('<p class="locked-message">累計10体撃破で地雷が解放されます。</p>');
+    }else facilityRows.push('<p class="locked-message">累計' +game.unlockAt("mines")+'体撃破で地雷が解放されます。</p>');
     if(game.isUnlocked("turret")){
       const deployed=!!s.facilities.turret;
       facilityRows.push('<div class="facility-row"><div><strong>'+facilityNames.turret+'</strong><small>'+
         facilityDescriptions.turret+'</small></div>'+actButton(deployed?"撤去":"設置","facility","turret","",
         !deployed&&game.capacityUsed()+2>stats.budget)+'</div>');
-    }else facilityRows.push('<p class="locked-message">累計16体撃破で自動砲台が解放されます。</p>');
+    }else facilityRows.push('<p class="locked-message">累計' +game.unlockAt("turret")+'体撃破で自動砲台が解放されます。</p>');
     const home=s.home;
     b.innerHTML='<div class="two-col"><section><h3>防衛設備</h3><p>設置中の設備が建設資源を消費。撤去すると枠が戻ります。</p>'+
       facilityRows.join("")+'</section><section><h3>守備位置</h3>'+
@@ -162,7 +162,7 @@ function renderHangar(){
       '<div class="home-map"><p>「戻る」コマンドの帰還地点です。位置変更で瞬間移動はしません。</p>'+
       '<p>現在： X '+Math.round(home.x)+' / Y '+Math.round(home.y)+'</p>'+
       actButton("西側","home","west")+" "+actButton("南側","home","south")+" "+actButton("東側","home","east")+'</div>':
-      '<p class="locked-message">累計2体撃破で守備位置の変更が解放されます。</p>')+
+      '<p class="locked-message">累計' +game.unlockAt("return")+'体撃破で守備位置の変更が解放されます。</p>')+
       '<h3 style="margin-top:24px">編成</h3><p>初期二足1機・合計2スロットは固定。多機編成はこの試作の対象外です。</p></section></div>';
   }else{
     b.innerHTML='<div class="two-col"><section><h3>恒久研究</h3><p>敗北でも解析データを持ち帰れます。基本の火力研究は最初から利用可能です。</p><div class="research-list">'+
@@ -171,12 +171,12 @@ function renderHangar(){
         return '<div class="research-row"><div><strong>'+r.name+'</strong><small>'+r.description+'</small></div>'+
           actButton(done?"研究済":"研究 "+r.cost+" データ","research",r.id,"",done||s.data<r.cost)+'</div>';
       }).join("")+'</div>'+
-      (!game.isUnlocked("mines")?'<p class="locked-message">累計10体で封鎖扉補強の研究が解放されます。</p>':'')+
-      (!game.isUnlocked("turret")?'<p class="locked-message">累計16体で建設資源拡張の研究が解放されます。</p>':'')+
+      (!game.isUnlocked("mines")?'<p class="locked-message">累計' +game.unlockAt("mines")+'体で封鎖扉補強の研究が解放されます。</p>':'')+
+      (!game.isUnlocked("turret")?'<p class="locked-message">累計' +game.unlockAt("turret")+'体で建設資源拡張の研究が解放されます。</p>':'')+
       '</section><section><h3>物語の進行</h3><p>物語を進めるまでは、同じレベル帯の敵が出続けます。</p>'+
       '<div class="tab-story"><h3>'+(s.tier===1?"次の敵帯":"敵帯 02 に到達")+'</h3><p class="'+
       (game.isUnlocked("story")?"story-ready":"")+'">'+
-      (s.tier===2?"新しい敵と侵攻方向が加わりました。":"累計 "+s.totalKills+" / 12 体撃破で解放（試作用の仮値）")+'</p>'+
+      (s.tier===2?"新しい敵と侵攻方向が加わりました。":"累計 "+s.totalKills+" / "+game.unlockAt("story")+" 体撃破で解放（試作用の仮値）")+'</p>'+
       (s.tier===1?actButton("次の物語へ進む","story","advance","",!game.isUnlocked("story")):"")+
       '</div><p>解放しても敵帯は勝手に変わりません。</p>'+
       '<div class="reset-progress">'+actButton(resetArmed?"本当に進行を初期化する？":"最初から解放を試す","reset","all","",false,resetArmed?"armed":"")+
@@ -219,7 +219,10 @@ function refresh(){
   const next=game.nextUnlock();
   el("unlock-next").textContent=next?"次の解放："+next.name:"すべての機能を解放済み";
   el("unlock-count").textContent=next?s.totalKills+" / "+next.kills+"体":"達成";
-  el("unlock-progress-bar").style.width=(next?Math.min(100,s.totalKills/next.kills*100):100)+"%";
+  // Progress is for the current milestone, not the all-time kill total.
+  const previousKills=next ? (UNLOCKS[UNLOCKS.indexOf(next)-1]?.kills ?? 0) : 0;
+  el("unlock-progress-bar").style.width=(next?
+    Math.min(100,Math.max(0,(s.totalKills-previousKills)/(next.kills-previousKills)*100)):100)+"%";
   const notice=game.unlockNotice;
   el("unlock-notice").hidden=!notice;
   if(notice){
