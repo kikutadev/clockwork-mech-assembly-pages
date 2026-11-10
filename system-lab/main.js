@@ -1,4 +1,4 @@
-import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, UNLOCKS, W, H, GATE, validPair} from "./sim.js?v=tactics-1";
+import {Game, CONDITIONS, ACTIONS, PARTS, RESEARCH, UNLOCKS, W, H, GATE, validPair} from "./sim.js?v=speed-1";
 
 const STORAGE_KEY="clockwork-system-lab-v2";
 let saved={};
@@ -7,7 +7,31 @@ const game=new Game(saved);
 const el=id=>document.getElementById(id);
 const canvas=el("field"),ctx=canvas.getContext("2d");
 let activeTab=game.isUnlocked("parts")?"parts":"research",lastFrame=performance.now(),uiTick=0,saveTick=0;
+const SIM_STEP=0.02;
+const SPEED_KEY="clockwork-system-lab-playback-speed";
+const SPEEDS=[1,2,3,5];
+let simRemainder=0;
+let playbackSpeed=1;
+try {const value=Number(localStorage.getItem(SPEED_KEY));if(SPEEDS.includes(value))playbackSpeed=value;}catch(_){}
 let lastChoiceKills=-1,lastWeapon="",renderedSlotCount=0,resetArmed=false;
+function renderSpeed(){
+  document.querySelectorAll("[data-speed]").forEach(button=>{
+    const selected=Number(button.dataset.speed)===playbackSpeed;
+    button.classList.toggle("on",selected);
+    button.setAttribute("aria-pressed",String(selected));
+  });
+}
+document.querySelector(".speed-control").addEventListener("click",e=>{
+  const button=e.target.closest("button[data-speed]");
+  if(!button)return;
+  const value=Number(button.dataset.speed);
+  if(!SPEEDS.includes(value))return;
+  playbackSpeed=value;
+  simRemainder=0; // Discard any partial step at a speed change.
+  try{localStorage.setItem(SPEED_KEY,String(value));}catch(_){}
+  renderSpeed();
+});
+renderSpeed();
 const facilityNames={turret:"自動砲台",mineW:"西側地雷",mineE:"東側地雷"};
 const facilityDescriptions={
   turret:"封鎖扉の右隣に設置。射程内の敵へ自動射撃（建設資源 2）",
@@ -412,13 +436,23 @@ function draw(){
   el("unit-label").style.top=(robot.y/H*100)+"%";
 }
 function frame(now){
-  const dt=Math.min(.06,(now-lastFrame)/1000);lastFrame=now;
+  // The engine caps one Game.step() at .05s; increasing a single dt cannot
+  // accelerate the world. Integrate fixed steps so firing and AI retain cadence.
+  const realDt=Math.min(.1,Math.max(0,(now-lastFrame)/1000));
+  lastFrame=now;
   const previousKills=game.save.totalKills;
   const previousTutorial=game.save.tutorialMoved;
-  game.step(dt);
+  if(!game.paused&&!game.defeated){
+    simRemainder+=realDt*playbackSpeed;
+    while(simRemainder>=SIM_STEP){
+      game.step(SIM_STEP);
+      simRemainder-=SIM_STEP;
+      if(game.paused||game.defeated){simRemainder=0;break;}
+    }
+  }else simRemainder=0;
   if(game.save.totalKills!==previousKills||game.save.tutorialMoved!==previousTutorial)persist();
   draw();
-  uiTick+=dt;saveTick+=dt;
+  uiTick+=realDt;saveTick+=realDt;
   if(uiTick>.17){refresh();uiTick=0;}
   if(saveTick>2){persist();saveTick=0;}
   requestAnimationFrame(frame);

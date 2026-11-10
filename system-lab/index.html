@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0e151b">
 <title>CLOCKWORK DEFENSE — SYSTEM LAB</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="./style.css?v=tactics-1">
+<link rel="stylesheet" href="./style.css?v=speed-1">
 </head>
 <body>
 <header class="topbar">
@@ -21,7 +21,7 @@
 </header>
 <div class="page">
   <section class="battle-zone" aria-label="戦場">
-    <div class="battle-head"><div class="chapter"><span class="pulse"></span><b>CONTINUOUS DEFENSE</b><span id="tier-label">敵帯 01 · 西側侵入</span></div><div class="field-time">経過 <b id="time-value">00:00</b><span class="dot-sep">•</span>敵 <b id="enemy-value">0</b></div></div>
+    <div class="battle-head"><div class="chapter"><span class="pulse"></span><b>CONTINUOUS DEFENSE</b><span id="tier-label">敵帯 01 · 西側侵入</span></div><div class="field-time">経過 <b id="time-value">00:00</b><span class="dot-sep">•</span>敵 <b id="enemy-value">0</b></div><div class="speed-control" role="group" aria-label="戦闘速度"><span>速度</span><button type="button" data-speed="1" aria-pressed="true">1×</button><button type="button" data-speed="2" aria-pressed="false">2×</button><button type="button" data-speed="3" aria-pressed="false">3×</button><button type="button" data-speed="5" aria-pressed="false">5×</button></div></div>
     <div id="field-wrap">
       <canvas id="field" width="900" height="560" aria-label="戦場：機体をタップ後、移動先の地面をタップ"></canvas>
       <div class="world-label label-gate">封鎖扉 <b id="gate-overlay">180</b></div>
@@ -65,6 +65,6 @@
 </div>
 <div id="defeat-modal" class="overlay" hidden><div class="defeat-box"><span class="red-eyebrow">DEFENSE LOST</span><h2>封鎖扉が破壊されました</h2><p>今回の失敗からも、次の防衛のための資源が残ります。</p><div class="result-metrics"><div><span>今回の撃破</span><b id="result-kills">0</b></div><div><span>解析データ</span><b id="result-data">0</b></div><div><span>強化素材</span><b id="result-material">0</b></div></div><button id="retry" class="primary">引き継いで再挑戦</button><small>コマンド・パーツ・研究・累計撃破数は維持されます</small></div></div>
 <footer><span>試作値：射程・火力・敵密度・報酬は未確定です。ゲームシステムの検証専用。</span><span>既存Godot本編とは独立・仕様の正本ではありません。</span></footer>
-<script type="module" src="./main.js?v=tactics-1"></script>
+<script type="module" src="./main.js?v=speed-1"></script>
 </body>
 </html>

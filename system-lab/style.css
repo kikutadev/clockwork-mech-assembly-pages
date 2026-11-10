@@ -42,3 +42,14 @@
 
 .tactic-hint{font-size:11px;line-height:1.65;color:#aadbd8;background:#12323a;border-left:3px solid #61afb4;padding:10px 11px;margin:13px 0 2px}
 .tactic-hint[hidden]{display:none}
+
+/* Live simulation-speed controls: 40px touch targets, readable in landscape. */
+.battle-head{flex-wrap:wrap}
+.speed-control{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.speed-control>span{color:#9aabb0;font-size:11px;margin-right:5px}
+.speed-control button{min-width:40px;min-height:40px;border:1px solid #405960;
+  background:#172930;color:#d5e3dd;border-radius:4px;font-size:13px;font-weight:700;
+  padding:7px 9px;touch-action:manipulation}
+.speed-control button.on{border-color:#aad5bb;background:#b1dcc2;color:#102d28}
+.speed-control button:focus-visible{outline:2px solid #e4c47f;outline-offset:2px}
+@media(max-width:540px){.speed-control{width:100%;justify-content:flex-end}}
