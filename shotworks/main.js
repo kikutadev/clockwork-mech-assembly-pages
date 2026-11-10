@@ -1,9 +1,11 @@
-import {Game,WIDTH,HEIGHT,CORE,LANES,TURRETS,MODULES,WAVES} from "./sim.js?v=1";
+import {Game,WIDTH,HEIGHT,CORE,LANES,TURRETS,MODULES,WAVES} from "./sim.js?v=2";
 const $=id=>document.getElementById(id);
 const KEY="shotworks-profile-v1";
 let cached={};try{cached=JSON.parse(localStorage.getItem(KEY)||"{}");}catch{}
 const game=new Game(cached);
 const canvas=$("battle"),ctx=canvas.getContext("2d");
+const testCanvas=$("test-canvas"),testCtx=testCanvas.getContext("2d");
+let preview=null,previewTime=0,previewSerial=0;
 let slot=0,elapsedUI=0,lastFrame=performance.now(),lastEffect=null,lastResult=null;
 let noticeUntil=0,selectedHint="初めは「分裂」を入れてみよう。",renderedProfile="";
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(game.exportProfile()));}catch{}}
@@ -47,7 +49,8 @@ function renderModules(){
   }
   $("socket-help").textContent="スロット"+num(slot+1)+"に入れるパーツを選択";
   $("unlock-info").textContent=game.available().length+"種類";
-  $("chips").innerHTML=Object.entries(MODULES).map(([id,module])=>{
+  // Show only usable parts; the next unlock is already visible in the discovery row.
+  $("chips").innerHTML=Object.entries(MODULES).filter(([id])=>game.isUnlocked(id)).map(([id,module])=>{
     const unlocked=game.isUnlocked(id);
     const equipped=game.profile.loadout.includes(id);
     return '<button class="chip '+(!unlocked?"chip-locked ":"")+(equipped?"chip-equipped":"")+
@@ -62,6 +65,7 @@ function renderModules(){
   $("reward-title").textContent=next[0];$("reward-sub").textContent=next[1];
   $("mobile-loadout").textContent=game.profile.loadout.filter(Boolean).map(id=>MODULES[id].name).join(" → ")||"未改造";
   explainSelection();
+  restartPreview();
 }
 $("sockets").addEventListener("click",e=>{
   const remove=e.target.closest("[data-remove]");
@@ -116,7 +120,7 @@ $("next").addEventListener("click",()=>{
   if(game.nextWave()){lastResult=null;lastEffect=null;stageNav();renderedProfile="";renderModules();$("outcome").hidden=true;update();persist();}
 });
 $("speed").addEventListener("click",()=>{
-  game.setSpeed(game.speed===1?2:game.speed===2?4:1);
+  game.setSpeed(game.speed===1?2:game.speed===2?5:1);
   $("speed").textContent="×"+game.speed;
 });
 function showResult(){
@@ -130,10 +134,24 @@ function showResult(){
   const delta=r.prevHp==null?null:r.hp-r.prevHp;
   $("outcome-delta").textContent=delta==null?"初回":(delta>0?"+":"")+delta;
   $("outcome-delta").style.color=delta>0?"#b9e7ae":delta<0?"#f4aaa1":"";
-  $("outcome-extras").textContent=r.extras+"発";
+  $("outcome-duration").textContent=r.seconds.toFixed(1)+"秒";
   $("outcome-description").textContent=r.won?
-    "同じ敵で順番を入れ替えると結果が変わるかも。":
+    "耐久が同じでも、撃破までの時間は変わります。":
     "同じ敵を出し直せます。パーツや順番を変えて再挑戦。";
+  const loadoutLabel=ids=>ids.map(id=>id?MODULES[id].name:"空き").join(" → ");
+  $("outcome-compare").hidden=!r.previous;
+  if(r.previous){
+    const box=$("outcome-compare");
+    box.replaceChildren();
+    const old=document.createElement("span");
+    old.textContent="前回 "+(r.previous.mixed?"戦闘中に交換":loadoutLabel(r.previous.modules))+
+      " · 耐久"+r.previous.hp+(r.previous.seconds==null?"":" / "+r.previous.seconds.toFixed(1)+"秒");
+    const arrow=document.createElement("b");arrow.textContent="→";
+    const current=document.createElement("span");
+    current.textContent="今回 "+(r.mixed?"戦闘中に交換":loadoutLabel(r.modules))+
+      " · 耐久"+r.hp+" / "+r.seconds.toFixed(1)+"秒";
+    box.append(old,arrow,current);
+  }
   $("next").disabled=!r.won||game.wave===WAVES.length;
   $("next").innerHTML=game.wave===WAVES.length?"全波をクリア":"次の侵攻へ <span>▶</span>";
   renderedProfile="";renderModules();stageNav();persist();
@@ -165,6 +183,84 @@ function update(){
     }
   }
   $("effect-banner").hidden=!lastEffect||performance.now()>noticeUntil;
+}
+// A noninteractive live test range. It uses the SAME Game.fire() and stepProjectiles()
+// as real defense; there are no fake projectile shapes or precomputed outcomes.
+const px=x=>27+(x-TURRETS.main.x)*1.15;
+const py=y=>75+(y-TURRETS.main.y)*.95;
+function restartPreview(){
+  const demo=new Game({completed:game.profile.completed,loadout:game.profile.loadout});
+  for(const [type,x,y,progress] of [
+    ["bug",628,322,.83],["pack",679,297,.71],["shell",720,348,.59]
+  ]){
+    const e=demo.spawn({type,lane:0});
+    Object.assign(e,{x,y,progress});
+  }
+  demo.fire("main");
+  preview=demo;previewTime=0;previewSerial++;
+  $("test-status").textContent="新しい弾を試射中";
+  $("test-impact").textContent="命中までの弾の動きを確認";
+}
+function stepPreview(dt){
+  if(!preview)return;
+  previewTime+=dt;
+  preview.time+=dt;
+  preview.stepProjectiles(dt);
+  const m=preview.metrics;
+  const changes=[];
+  if(m.extraBullets)changes.push("派生弾 "+m.extraBullets+"発");
+  if(m.blastHits)changes.push("爆風 "+m.blastHits+"命中");
+  if(m.pierces)changes.push("貫通 "+m.pierces+"回");
+  if(m.slows)changes.push("冷却 "+m.slows+"体");
+  if(m.arcHits)changes.push("電撃 "+m.arcHits+"体");
+  const label=changes.length?changes.join(" / "):
+    m.impacts>0?"通常弾が命中":"命中までの弾の動きを確認";
+  if($("test-impact").textContent!==label)$("test-impact").textContent=label;
+  if(previewTime>2.8)restartPreview();
+}
+function drawPreview(){
+  const c=testCtx;
+  c.clearRect(0,0,340,150);
+  c.fillStyle="#11292c";c.fillRect(0,0,340,150);
+  c.strokeStyle="#385656";c.lineWidth=15;c.lineCap="round";
+  c.beginPath();c.moveTo(75,76);c.lineTo(325,76);c.stroke();
+  c.strokeStyle="#728778";c.lineWidth=1.5;c.setLineDash([9,11]);
+  c.beginPath();c.moveTo(75,76);c.lineTo(325,76);c.stroke();c.setLineDash([]);
+  c.fillStyle="#9cbeb0";c.font="10px system-ui";c.fillText("TEST FIRE",10,18);
+  c.fillStyle="#2d6665";c.fillRect(17,60,22,30);
+  c.strokeStyle="#c5dfbf";c.lineWidth=4;c.beginPath();c.moveTo(25,75);c.lineTo(59,75);c.stroke();
+  for(const e of preview.enemies){
+    const x=px(e.x),y=py(e.y),r=Math.max(7,e.r*.72);
+    c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fillStyle=e.fill;c.fill();
+    c.strokeStyle=e.cold>0?"#a7eff5":"#203d42";c.lineWidth=e.cold>0?4:2;c.stroke();
+    c.fillStyle="#203940";c.fillRect(x-r,y-r-8,r*2,3);
+    c.fillStyle="#b9dbba";c.fillRect(x-r,y-r-8,r*2*Math.max(0,e.hp/e.maxHp),3);
+  }
+  for(const p of preview.bullets){
+    const x=px(p.x),y=py(p.y),lx=px(p.px),ly=py(p.py);
+    c.strokeStyle=p.shard?"#f9bc8c":"#fff0bd";c.lineWidth=p.shard?3:5;
+    c.beginPath();c.moveTo(lx,ly);c.lineTo(x,y);c.stroke();
+    c.fillStyle=p.shard?"#f8ba89":"#ffe4a5";
+    c.beginPath();c.arc(x,y,p.shard?4:6,0,Math.PI*2);c.fill();
+  }
+  for(const fx of preview.effects){
+    const f=fx.life/fx.max;
+    c.globalAlpha=Math.max(0,Math.min(1,f));
+    if(fx.kind==="blast"||fx.kind==="frost"){
+      c.strokeStyle=fx.kind==="blast"?"#ffc491":"#a4e5f5";c.lineWidth=5;
+      c.beginPath();c.arc(px(fx.x),py(fx.y),fx.r*.85*(.5+.5*(1-f)),0,Math.PI*2);c.stroke();
+    }else if(fx.kind==="arc"){
+      c.strokeStyle="#dbc0ff";c.lineWidth=4;c.beginPath();c.moveTo(px(fx.x),py(fx.y));
+      c.lineTo(px(fx.x2)-9,py(fx.y2)-9);c.lineTo(px(fx.x2),py(fx.y2));c.stroke();
+    }else if(["launch","pierce","hit","kill"].includes(fx.kind)){
+      c.strokeStyle=fx.kind==="pierce"?"#f6e8ab":"#efcca5";c.lineWidth=2;
+      c.beginPath();c.arc(px(fx.x),py(fx.y),9+(1-f)*15,0,Math.PI*2);c.stroke();
+    }
+    c.globalAlpha=1;
+  }
+  if(previewTime>1.4){
+    c.fillStyle="#b3d6bd";c.font="11px system-ui";c.fillText("↻ 自動リプレイ",225,137);
+  }
 }
 const bg=document.createElement("canvas");bg.width=WIDTH;bg.height=HEIGHT;
 const b=bg.getContext("2d");b.fillStyle="#2a3a3b";b.fillRect(0,0,WIDTH,HEIGHT);
@@ -290,7 +386,8 @@ function draw(){
 function frame(now){
   const dt=Math.max(0,Math.min(.05,(now-lastFrame)/1000));lastFrame=now;
   for(let i=0;i<game.speed;i++)game.step(dt);
-  draw();elapsedUI+=dt;
+  stepPreview(dt);
+  draw();drawPreview();elapsedUI+=dt;
   if(elapsedUI>.11){update();elapsedUI=0;}
   requestAnimationFrame(frame);
 }

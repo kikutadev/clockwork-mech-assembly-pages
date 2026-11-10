@@ -17,3 +17,13 @@
 .mobile-test{display:block;width:100%;margin-top:11px;min-height:46px;padding:12px 16px;background:#b7dec1;border:1px solid #ccebd0;border-radius:4px;color:#143024;font-weight:800;font-size:13px}
 }
 @media(max-width:390px){.mobile-customize{padding:9px;gap:6px}.mobile-customize b{font-size:11px}.mobile-customize strong{font-size:10px}}
+/* A short, continuously looping shot powered by the real projectile simulation. */
+.testbench{margin-top:12px;padding:11px 12px 8px;border:1px solid #648779;background:#142d30;border-radius:4px}
+.testbench-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.testbench-head strong{font-size:12px;color:#d9edde}
+.testbench-head span{font-size:10px;color:#a8cdb7}
+#test-canvas{display:block;width:100%;height:auto;aspect-ratio:340/150;background:#11292c;border:1px solid #3b5d5c;border-radius:3px}
+.test-impact{font-size:11px;line-height:1.5;color:#c8dac4;min-height:20px;margin-top:7px}
+.outcome-compare{display:flex;align-items:center;flex-wrap:wrap;gap:7px;padding:10px 12px;width:100%;background:#17312f;border-top:1px solid #537b6d;font-size:11px;color:#b9d3c5;line-height:1.6}
+.outcome-compare b{color:#f6d2a3;font-size:14px}
+.outcome-compare span:last-child{color:#e0ebd5;font-weight:700}
