@@ -2,7 +2,7 @@
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101a1c"><link rel="icon" href="data:,">
-<title>CIRCUIT SIEGE — Programmable Defense</title><link rel="stylesheet" href="./style.css"></head>
+<title>CIRCUIT SIEGE — Programmable Defense</title><link rel="stylesheet" href="./style.css?v=chips-1"></head>
 <body>
 <header class="header">
   <div class="brand"><span class="sigil">◇</span><div><strong>CIRCUIT SIEGE</strong><small>PROGRAMMABLE TOWER DEFENSE</small></div></div>
@@ -46,6 +46,7 @@
     </div>
     <div id="selected-panel" hidden>
       <div class="tower-overview" id="tower-overview"></div>
+      <div class="chip-config"><label for="chip-select">拡張チップ</label><select id="chip-select" aria-label="拡張チップ"></select><small id="chip-hint"></small></div>
       <div class="preset-section"><span>QUICK CIRCUITS</span><div id="presets" class="presets"></div></div>
       <div class="circuit-header"><b>優先回路</b><small>上から判定 / 発動できなければ次へ</small></div>
       <div id="rules" class="rules"></div>
@@ -58,4 +59,4 @@
 </main>
 <div id="defeat" class="overlay" hidden><div class="result"><span class="defeat-eyebrow">CORE BREACHED</span><h2>コアが突破されました</h2><p>砲台の配置や命令を変えて再挑戦。解放した回路と累計撃破は引き継ぎます。</p><div class="result-grid"><div><span>今回の撃破</span><b id="result-kills">0</b></div><div><span>到達した波</span><b id="result-wave">1</b></div><div><span>累計撃破</span><b id="result-total">0</b></div></div><button id="retry" class="primary">新しい配置で再挑戦</button></div></div>
 <footer><span>自動化のゲーム性を比較する独立試作。見た目・数値は検証用です。</span><span>既存のSystem Lab / Godot本編とは別作品扱い。</span></footer>
-<script type="module" src="./main.js"></script></body></html>
+<script type="module" src="./main.js?v=chips-1"></script></body></html>

@@ -1,4 +1,4 @@
-import {Game,WIDTH,HEIGHT,PATHS,PADS,CORE,CHASSIS,CONDITIONS,TARGETS,SKILLS,UNLOCKS} from "./sim.js";
+import {Game,WIDTH,HEIGHT,PATHS,PADS,CORE,CHASSIS,CHIPS,CONDITIONS,TARGETS,SKILLS,UNLOCKS} from "./sim.js?v=chips-1";
 const $=id=>document.getElementById(id);
 const KEY="clockwork-circuit-siege-profile-v1";
 let stored={};try{stored=JSON.parse(localStorage.getItem(KEY)||"{}");}catch{}
@@ -29,6 +29,8 @@ function renderInspector(){
   $("tower-overview").innerHTML='<div><span>有効射程</span><b>'+range+'m</b></div>'+
     '<div><span>射撃間隔</span><b>'+ch.rate.toFixed(2)+'倍</b></div>'+
     '<div><span>発動回数</span><b id="tower-shots">'+t.shots+'</b></div>';
+  $("chip-select").innerHTML=Object.entries(CHIPS).map(([id,chip])=>option(id,chip,t.chip)).join("");
+  $("chip-hint").textContent=CHIPS[t.chip]?.desc||"基本性能";
   $("rules").innerHTML=t.rules.map((r,i)=>
     '<article class="rule" data-rule="'+i+'"><div class="rule-top"><b>回路 '+String(i+1).padStart(2,"0")+
     (i===0?' · 優先':'')+'</b><span class="rule-state" id="rule-state-'+i+'">判定待ち</span></div>'+
@@ -48,6 +50,10 @@ function renderInspector(){
   $("sell").disabled=game.phase==="lost";
   updateRuleStates();
 }
+$("chip-select").addEventListener("change",e=>{
+  const t=game.selectedTower();
+  if(t&&game.setChip(t.id,e.target.value)){save();renderInspector();updateLive();}
+});
 $("presets").addEventListener("click",e=>{
   const button=e.target.closest("button[data-preset]");if(!button)return;
   const t=game.selectedTower(),preset=PRESETS[button.dataset.preset];

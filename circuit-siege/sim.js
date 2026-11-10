@@ -15,6 +15,13 @@ export const CHASSIS={
   relay:{name:"リレー",price:95,range:181,rate:1.13,damage:.86,energy:.78,color:"#8ec7e4",hint:"状態付与を省エネで回す"},
   lens:{name:"レンズ",price:125,range:227,rate:1.4,damage:1.32,energy:1.23,color:"#ecc591",hint:"長射程で強打・低速"}
 };
+export const CHIPS={
+  standard:{name:"標準回路",damage:1,rate:1,energy:1,area:1,status:1,desc:"基本性能を維持"},
+  quick:{name:"速射回路",damage:.82,rate:.74,energy:1.06,area:1,status:1,desc:"短い待機時間、威力は低下"},
+  power:{name:"高出力回路",damage:1.37,rate:1.14,energy:1.28,area:1,status:1,desc:"大威力、消費ENと待機時間が増加"},
+  scatter:{name:"拡散回路",damage:.88,rate:1.1,energy:1.08,area:1.42,status:1.23,desc:"範囲・状態付与時間を拡大"},
+  eco:{name:"省電力回路",damage:.92,rate:1.07,energy:.65,area:1,status:1,desc:"消費ENを節約、威力と速度が少し低下"}
+};
 export const CONDITIONS={
   any:{name:"敵が射程内"},
   crowd:{name:"密集した敵がいる"},
@@ -109,7 +116,8 @@ export class Game{
     this.profile={
       totalKills:Math.max(0,Number(profile.totalKills)||0),
       bestWave:Math.max(0,Number(profile.bestWave)||0),
-      presets:profile.presets&&typeof profile.presets==="object"?copy(profile.presets):{}
+      presets:profile.presets&&typeof profile.presets==="object"?copy(profile.presets):{},
+      chips:profile.chips&&typeof profile.chips==="object"?copy(profile.chips):{}
     };
     this.resetRun();
   }
@@ -141,6 +149,7 @@ export class Game{
     this.credits-=ch.price;
     const tower={id:this.nextTowerId++,pad,chassis,level:1,wait:0,last:"待機",
       activeRule:-1,activeTimer:0,shots:0,spent:ch.price,
+      chip:CHIPS[this.profile.chips[chassis]]?this.profile.chips[chassis]:"standard",
       rules:this.profile.presets[chassis]?
         copy(this.profile.presets[chassis]):defaultRules()};
     this.towers.push(tower);
@@ -166,6 +175,13 @@ export class Game{
     if(this.credits<cost)return false;
     this.credits-=cost;t.spent+=cost;t.level++;
     this.log("砲台を強化。Lv."+t.level);
+    return true;
+  }
+  setChip(id,chip){
+    const t=this.towers.find(t=>t.id===id);
+    if(!t||!CHIPS[chip]||this.phase==="lost")return false;
+    t.chip=chip;
+    this.profile.chips[t.chassis]=chip;
     return true;
   }
   setRule(id,index,condition,skill,target){
@@ -247,20 +263,22 @@ export class Game{
   }
   cast(t,rule,target){
     const sk=SKILLS[rule.skill],ch=CHASSIS[t.chassis],pad=PADS[t.pad];
-    const base=sk.damage*ch.damage*(1+.22*(t.level-1));
+    const chip=CHIPS[t.chip]||CHIPS.standard;
+    const base=sk.damage*ch.damage*(1+.22*(t.level-1))*chip.damage;
     const all=this.enemies.filter(e=>!e.dead&&e.hp>0);
     const hit=(e,amount,opts)=>this.damage(e,amount,opts);
     const explosion=(point,r,amount,kind="blast")=>{
-      this.effects.push({kind,x:point.x,y:point.y,life:.43,max:.43,r});
-      for(const e of all.filter(o=>dist(o,point)<r+o.r))hit(e,amount*(kind==="nova"&&e.chill>0?1.7:1));
+      const radius=r*chip.area;
+      this.effects.push({kind,x:point.x,y:point.y,life:.43,max:.43,r:radius});
+      for(const e of all.filter(o=>dist(o,point)<radius+o.r))hit(e,amount*(kind==="nova"&&e.chill>0?1.7:1));
     };
     switch(rule.skill){
       case "bolt": hit(target,base);break;
       case "chill":
-        if(target.chill<1)target.chill=2.8;
+        if(target.chill<1)target.chill=2.8*chip.status;
         hit(target,base);break;
       case "mark":
-        target.mark=4.8;
+        target.mark=4.8*chip.status;
         this.effects.push({kind:"mark",x:target.x,y:target.y,life:.4,max:.4});
         break;
       case "blast":explosion(target,58,base);break;
@@ -269,7 +287,7 @@ export class Game{
         let current=target;
         while(current&&victims.length<4){
           visited.add(current.id);victims.push(current);
-          const remaining=all.filter(e=>!visited.has(e.id)&&dist(e,current)<110);
+          const remaining=all.filter(e=>!visited.has(e.id)&&dist(e,current)<110*chip.area);
           current=remaining.sort((a,b)=>dist(a,current)-dist(b,current))[0];
         }
         let last=pad;
@@ -335,11 +353,12 @@ export class Game{
       if(rule.skill==="mark")eligible=eligible.filter(e=>e&&e.mark<=0);
       if(rule.skill==="chill")eligible=eligible.filter(e=>e&&e.chill<=1);
       if(!eligible.length)continue;
-      const cost=Math.ceil(skill.energy*CHASSIS[t.chassis].energy);
+      const chip=CHIPS[t.chip]||CHIPS.standard;
+      const cost=Math.ceil(skill.energy*CHASSIS[t.chassis].energy*chip.energy);
       if(this.energy<cost){t.last="EN不足 → 下位の命令を確認";continue;}
       const target=eligible[0]===null?null:this.chooseTarget(eligible,rule.target);
       this.energy-=cost;
-      t.wait=skill.cd*CHASSIS[t.chassis].rate;
+      t.wait=skill.cd*CHASSIS[t.chassis].rate*chip.rate;
       t.activeRule=i;t.activeTimer=.45;
       this.cast(t,rule,target);
       return;
