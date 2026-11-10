@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101b23"><link rel="icon" href="data:,">
+<title>SHOTWORKS — 弾を育てる防衛ゲーム</title>
+<link rel="stylesheet" href="./style.css?v=1"></head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="brand-icon">✴</div><div><strong>SHOTWORKS</strong><small>改造するのは、たった一発の弾。</small></div></div>
+  <div class="metrics">
+    <div><span>コア耐久</span><strong id="core-value">100 <small>/ 100</small></strong></div>
+    <div><span>撃破</span><strong id="kill-value">0 <small>体</small></strong></div>
+    <div><span>防衛波</span><strong id="wave-value">01 <small>/ 04</small></strong></div>
+  </div>
+</header>
+<main class="main">
+  <section class="field-column">
+    <div class="field-header">
+      <div><div class="eyebrow"><span class="live-led"></span> DEFENSE FIELD <span id="phase-tag">準備中</span></div>
+      <h1 id="wave-name">第1波：後ろに続く群れ</h1></div>
+      <div class="field-hint" id="wave-hint">1発で1体倒しても、後続が抜けてしまう。弾を増やせない？</div>
+    </div>
+    <button id="mobile-customize" class="mobile-customize" type="button"><span>現在の弾</span><b id="mobile-loadout">未改造</b><strong>改造する ↓</strong></button>
+    <div class="canvas-wrap" id="canvas-wrap">
+      <canvas id="battle" width="1000" height="600" aria-label="北と南のルートから敵が迫る自動防衛フィールド"></canvas>
+      <div class="field-mark entry-n">NORTH IN</div><div class="field-mark entry-s">SOUTH IN</div>
+      <div class="field-mark core-mark">CORE</div>
+      <div class="effect-banner" id="effect-banner" hidden><span id="effect-emoji">✧</span><div><strong id="effect-name">分裂した！</strong><small id="effect-note">2発の追加弾</small></div></div>
+      <div class="field-bottom-mark">MAIN CANNON / 弾は左から右のパーツ順に変化</div>
+    </div>
+    <div class="field-controls">
+      <div class="status"><span class="status-dot"></span><strong id="state">準備中</strong><span id="remaining">敵はまだ来ていません</span></div>
+      <div class="field-actions">
+        <button id="speed" class="speed" type="button">×1</button>
+        <button id="retry-top" class="ghost" type="button" disabled>同じ敵でやり直す</button>
+        <button id="start" class="primary" type="button">迎撃開始 <span>▶</span></button>
+      </div>
+    </div>
+    <div id="outcome" class="outcome" hidden aria-live="polite">
+      <div class="outcome-copy"><small id="outcome-tag">WAVE CLEARED</small><h2 id="outcome-title">防衛成功！</h2><p id="outcome-description">新しい弾を試してみよう。</p></div>
+      <div class="outcome-numbers"><div><span>残り耐久</span><strong id="outcome-hp">100</strong></div><div><span>前回との差</span><strong id="outcome-delta">初回</strong></div><div><span>派生弾</span><strong id="outcome-extras">0</strong></div></div>
+      <div class="outcome-buttons"><button id="retry" class="outline" type="button">同じ敵でもう一度</button><button id="next" class="primary" type="button">次の侵攻へ <span>▶</span></button></div>
+    </div>
+    <div class="wave-list" id="wave-list" aria-label="防衛波を選択"></div>
+  </section>
+  <aside class="workshop" id="workshop">
+    <div class="workshop-title"><small>YOUR PROJECTILE</small><h2>弾を改造する</h2><p>1つ変えるだけで、攻撃の形が変わる。</p></div>
+    <div class="socket-label"><strong>弾の加工順</strong><span>左から右へ作用</span></div>
+    <div class="sockets" id="sockets">
+      <button class="socket active" data-slot="0" type="button"><span class="socket-number">01</span><b>空きスロット</b><small>パーツを選択</small></button>
+      <div class="socket-arrow">→</div>
+      <button class="socket" data-slot="1" type="button"><span class="socket-number">02</span><b>空きスロット</b><small>パーツを選択</small></button>
+    </div>
+    <div class="socket-actions"><span id="socket-help">スロット01に入れるパーツを選んでください</span><button id="swap" type="button" title="左右の順番を入れ替える">⇄ 順番を入替</button></div>
+    <div class="chip-heading"><strong>使えるパーツ</strong><span id="unlock-info">3種類</span></div>
+    <div class="chips" id="chips"></div>
+    <button id="mobile-test" class="mobile-test" type="button">この弾で迎撃してみる ↑</button>
+    <div class="next-reward" id="next-reward"><span class="spark">✦</span><div><small>NEXT DISCOVERY</small><strong id="reward-title">第1波の防衛で「冷却」を獲得</strong><span id="reward-sub">好きな組み合わせが増えていく</span></div></div>
+    <div class="explain" id="explain"><b>💡 まずは「分裂」を入れてみよう</b><p>発射した弾が命中時に増えるので、後ろにいる敵も倒せるようになります。</p></div>
+    <div class="workshop-bottom"><span>パーツは戦闘中も交換できます。<br>ゲームが勝手に最適な組み合わせへ変更することはありません。</span></div>
+  </aside>
+</main>
+<footer>操作テスト用の独立試作。旧Web試作とGodot本編は別に維持しています。</footer>
+<script type="module" src="./main.js?v=1"></script>
+</body></html>
